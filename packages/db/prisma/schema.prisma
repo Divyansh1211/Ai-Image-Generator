@@ -22,37 +22,35 @@ model User {
 }
 
 model Model {
-  id        String          @id @default(cuid())
-  name      String
-  type      ModelTypeEnum
-  age       Int
-  ethnicity EthnicityEnum
-  eyeColor  EyeColorEnum
-  bald      Boolean
-  userId    String
-  training  TainingImages[]
-  output    OutputImages[]
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-}
-
-model TainingImages {
-  id       String @id @default(cuid())
-  imageUrl String
-  modelId  String
-  model    Model  @relation(fields: [modelId], references: [id])
+  id             String               @id @default(cuid())
+  name           String
+  type           ModelTypeEnum
+  age            Int
+  ethnicity      EthnicityEnum
+  eyeColor       EyeColorEnum
+  bald           Boolean
+  userId         String
+  triggerWord    String?
+  tensorPath     String?
+  trainingStatus ModelImageStatusEnum @default(Pending)
+  output         OutputImages[]
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  falAiRequestId String?
+  zipUrl         String
 }
 
 model OutputImages {
-  id        String                @id @default(cuid())
-  imageUrl  String                
-  modelId   String
-  userId    String
-  prompt    String
-  status    OutputImageStatusEnum @default(Pending)
-  model     Model                 @relation(fields: [modelId], references: [id])
-  createdAt DateTime              @default(now())
-  updatedAt DateTime              @updatedAt
+  id             String                @id @default(cuid())
+  imageUrl       String
+  modelId        String
+  userId         String
+  prompt         String
+  falAiRequestId String?
+  status         OutputImageStatusEnum @default(Pending)
+  model          Model                 @relation(fields: [modelId], references: [id])
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
 }
 
 model Packs {
@@ -66,6 +64,12 @@ model PackPrompts {
   packId String
   prompt String
   pack   Packs  @relation(fields: [packId], references: [id])
+}
+
+enum ModelImageStatusEnum {
+  Pending
+  Generated
+  Failed
 }
 
 enum OutputImageStatusEnum {
