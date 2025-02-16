@@ -1,4 +1,8 @@
-import express from "express";
+import express, {
+  type ErrorRequestHandler,
+  type Request,
+  type Response,
+} from "express";
 import {
   GenerateImage,
   GenerateImagesFromPack,
@@ -8,10 +12,15 @@ import { prismaClient } from "db";
 import { S3Client } from "bun";
 import { FalAIModel } from "./models/FalAIModel";
 import cors from "cors";
+import { authMiddleware } from "./middleware";
+import crypto from "crypto";
+import { Webhook } from "svix";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
 
 const credentials = {
   accessKeyId: process.env.S3_ACCESS_KEY_ID,
@@ -20,13 +29,11 @@ const credentials = {
   endpoint: process.env.ENDPOINT,
 };
 
-const USER_ID = "1";
-
 const PORT = process.env.PORT || 8080;
 
 const falAiModel = new FalAIModel();
 
-app.get("/pre-signed-url", async (req, res) => {
+app.get("/pre-signed-url", authMiddleware, async (req, res) => {
   const key = `models/${Date.now()}_${Math.random()}.zip`;
   const url = S3Client.presign(key, {
     ...credentials,
@@ -41,40 +48,44 @@ app.get("/pre-signed-url", async (req, res) => {
   });
 });
 
-app.post("/ai/training", async (req, res) => {
-  const parsedBody = TrainModel.safeParse(req.body);
-  const images = req.body.images;
+app.post(
+  "/ai/training",
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    const parsedBody = TrainModel.safeParse(req.body);
+    const images = req.body.images;
 
-  if (!parsedBody.success) {
-    res.status(411).json(parsedBody.error);
-    return;
+    if (!parsedBody.success) {
+      res.status(411).json(parsedBody.error);
+      return;
+    }
+
+    const { request_id, response_url } = await falAiModel.trainModel(
+      parsedBody.data.zipUrl,
+      parsedBody.data.name
+    );
+
+    const data = await prismaClient.model.create({
+      data: {
+        name: parsedBody.data.name,
+        type: parsedBody.data.type,
+        age: parsedBody.data.age,
+        ethnicity: parsedBody.data.ethnicity,
+        eyeColor: parsedBody.data.eyeColor,
+        bald: parsedBody.data.bald,
+        userId: req.userId.toString(),
+        zipUrl: parsedBody.data.zipUrl,
+        falAiRequestId: request_id,
+      },
+    });
+
+    res.json({
+      modelId: data.id,
+    });
   }
+);
 
-  const { request_id, response_url } = await falAiModel.trainModel(
-    parsedBody.data.zipUrl,
-    parsedBody.data.name
-  );
-
-  const data = await prismaClient.model.create({
-    data: {
-      name: parsedBody.data.name,
-      type: parsedBody.data.type,
-      age: parsedBody.data.age,
-      ethnicity: parsedBody.data.ethnicity,
-      eyeColor: parsedBody.data.eyeColor,
-      bald: parsedBody.data.bald,
-      userId: USER_ID,
-      zipUrl: parsedBody.data.zipUrl,
-      falAiRequestId: request_id,
-    },
-  });
-
-  res.json({
-    modelId: data.id,
-  });
-});
-
-app.post("/ai/generate", async (req, res) => {
+app.post("/ai/generate", authMiddleware, async (req, res) => {
   const parsedBody = GenerateImage.safeParse(req.body);
   if (!parsedBody.success) {
     res.status(411).json(parsedBody.error);
@@ -101,7 +112,7 @@ app.post("/ai/generate", async (req, res) => {
     data: {
       prompt: parsedBody.data.prompt,
       modelId: parsedBody.data.modelId,
-      userId: USER_ID,
+      userId: req.userId.toString(),
       imageUrl: "",
     },
   });
@@ -110,7 +121,7 @@ app.post("/ai/generate", async (req, res) => {
   });
 });
 
-app.post("/pack/generate", async (req, res) => {
+app.post("/pack/generate", authMiddleware, async (req, res) => {
   const parsedBody = GenerateImagesFromPack.safeParse(req.body);
   if (!parsedBody.success) {
     res.status(411).json(parsedBody.error);
@@ -133,7 +144,7 @@ app.post("/pack/generate", async (req, res) => {
     data: prompts.map((prompt, index) => ({
       prompt: prompt.prompt,
       modelId: parsedBody.data.modelId,
-      userId: USER_ID,
+      userId: req.userId.toString(),
       imageUrl: "",
       falAiRequestId: requestIds[index].request_id,
     })),
@@ -148,7 +159,7 @@ app.get("/pack/bulk", async (req, res) => {
   res.json(packs);
 });
 
-app.get("/image/bulk", async (req, res) => {
+app.get("/image/bulk", authMiddleware, async (req, res) => {
   const imageIds = req.query.images as string[];
   const limit = (req.query.limit as string) ?? "10";
   const offset = (req.query.offset as string) ?? "0";
@@ -158,7 +169,7 @@ app.get("/image/bulk", async (req, res) => {
       id: {
         in: imageIds,
       },
-      userId: USER_ID,
+      userId: req.userId.toString(),
     },
     take: parseInt(limit),
     skip: parseInt(offset),
@@ -197,6 +208,63 @@ app.post("/fal-ai/webhook/image", async (req, res) => {
     },
   });
   res.status(200).send("OK");
+});
+
+app.post("/webhook/create-user", async (req, res) => {
+  try {
+    if (!WEBHOOK_SECRET) return;
+    const wh = new Webhook(WEBHOOK_SECRET);
+
+    const headers = req.headers;
+    const payload = req.body;
+
+    const svix_id = headers["svix-id"];
+    const svix_timestamp = headers["svix-timestamp"];
+    const svix_signature = headers["svix-signature"];
+
+    if (!svix_id || !svix_timestamp || !svix_signature) {
+      return void res.status(400).json({
+        success: false,
+        message: "Error: Missing svix headers",
+      });
+    }
+
+    let evt: any;
+    try {
+      evt = wh.verify(JSON.stringify(payload), {
+        "svix-id": svix_id as string,
+        "svix-timestamp": svix_timestamp as string,
+        "svix-signature": svix_signature as string,
+      });
+    } catch (err: any) {
+      console.log("Error: Could not verify webhook:", err.message);
+      return void res.status(400).json({
+        success: false,
+        message: err.message,
+      });
+    }
+    try {
+      const user = await prismaClient.user.create({
+        data: {
+          username: evt.data.first_name,
+          profilePicture: evt.data.profile_image_url,
+          id: evt.data.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+      res.status(200).send(`User ${user.username} created`);
+    } catch (err: any) {
+      console.log("Error: Could not create user:", err.message);
+      return void res.status(400).json({
+        success: false,
+        message: err.message,
+      });
+    }
+  } catch (error: any) {
+    console.error("Error processing webhook:", error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.listen(PORT, () => {

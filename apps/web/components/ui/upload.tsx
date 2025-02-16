@@ -9,10 +9,16 @@ import {
 } from "@/components/ui/card";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
-import { BACKEND_URL } from "@/app/config";
+import { BACKEND_URL, CLOUDFLARE_URL } from "@/app/config";
 import JSZip from "jszip";
+import { useAuth } from "@clerk/nextjs";
 
-export default function Upload() {
+export default function Upload({
+  onUploadDone,
+}: {
+  onUploadDone: (zipUrl: string) => void;
+}) {
+  const { getToken } = useAuth();
   return (
     <Card>
       <CardContent className="flex flex-col items-center justify-center border-2 border-zinc-200 dark:border-zinc-800 rounded-lg p-10 space-y-6">
@@ -23,6 +29,7 @@ export default function Upload() {
           onClick={async () => {
             const input = document.createElement("input");
             input.type = "file";
+            input.accept = "image/*";
             input.multiple = true;
             input.onchange = async () => {
               const files = input.files;
@@ -35,12 +42,19 @@ export default function Upload() {
               }
               const blob = await zip.generateAsync({ type: "blob" });
               const formData = new FormData();
-              const response = await axios.get(`${BACKEND_URL}/pre-signed-url`);
+              const token = await getToken();
+              const response = await axios.get(
+                `${BACKEND_URL}/pre-signed-url`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                }
+              );
               const { url, key } = response.data;
               formData.append("file", blob);
-              formData.append("key", url);
               const res = await axios.put(url, formData);
-              console.log(res);
+              onUploadDone(`${CLOUDFLARE_URL}/${key}`);
             };
             input.click();
           }}

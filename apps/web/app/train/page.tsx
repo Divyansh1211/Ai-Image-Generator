@@ -1,3 +1,5 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,8 +19,57 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Upload from "@/components/ui/upload";
+import { useState } from "react";
+import { TrainModelInput } from "common/inferred";
+import axios from "axios";
+import { BACKEND_URL } from "../config";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 
-export default function Home() {
+export default function Train() {
+  const [zipUrl, setZipUrl] = useState<string | null>(null);
+  const [name, setName] = useState<string | null>(null);
+  const [type, setType] = useState<"Man" | "Woman" | "Others" | null>(null);
+  const [age, setAge] = useState<string | null>(null);
+  const [ethnicity, setEthnicity] = useState<
+    | "White"
+    | "Black"
+    | "Asian_American"
+    | "East_Asian"
+    | "South_East_Asian"
+    | "South_Asian"
+    | "Middle_Eastern"
+    | "Hispanic"
+    | "Pacific"
+    | null
+  >(null);
+  const [eyeColor, setEyeColor] = useState<
+    "Brown" | "Blue" | "Hazel" | "Gray" | null
+  >(null);
+  const [bald, setBald] = useState<boolean | null>(null);
+  const router = useRouter();
+  const { getToken } = useAuth();
+
+  async function trainModel() {
+    const input: TrainModelInput = {
+      zipUrl: zipUrl!,
+      type: type!,
+      age: parseInt(age!),
+      name: name!,
+      eyeColor: eyeColor!,
+      ethnicity: ethnicity!,
+      bald: bald!,
+    };
+    const token = await getToken();
+    console.log(token);
+    const res = await axios.post(`${BACKEND_URL}/ai/training`, input, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    router.push("/");
+  }
+
   return (
     <div className="flex items-center justify-center h-screen">
       <Card className="w-[350px]">
@@ -33,11 +84,17 @@ export default function Home() {
             <div className="grid w-full items-center gap-4">
               <div className="flex flex-col space-y-1.5">
                 <Label htmlFor="name">Name</Label>
-                <Input id="name" placeholder="Name of the Model" />
+                <Input
+                  id="name"
+                  placeholder="Name of the Model"
+                  onChange={(e) => {
+                    setName(e.target.value);
+                  }}
+                />
               </div>
               <div className="flex flex-col space-y-1.5">
                 <Label htmlFor="name">Type</Label>
-                <Select>
+                <Select onValueChange={(value) => setType(value as any)}>
                   <SelectTrigger id="name">
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
@@ -50,11 +107,17 @@ export default function Home() {
               </div>
               <div className="flex flex-col space-y-1.5">
                 <Label htmlFor="name">Age</Label>
-                <Input id="name" placeholder="Age of the Model" />
+                <Input
+                  id="name"
+                  placeholder="Age of the Model"
+                  onChange={(e) => {
+                    setAge(e.target.value);
+                  }}
+                />
               </div>
               <div className="flex flex-col space-y-1.5">
                 <Label htmlFor="name">Ethnicity</Label>
-                <Select>
+                <Select onValueChange={(value) => setEthnicity(value as any)}>
                   <SelectTrigger id="name">
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
@@ -79,7 +142,7 @@ export default function Home() {
               </div>
               <div className="flex flex-col space-y-1.5">
                 <Label htmlFor="name">Eye Color</Label>
-                <Select>
+                <Select onValueChange={(value) => setEyeColor(value as any)}>
                   <SelectTrigger id="name">
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
@@ -93,7 +156,7 @@ export default function Home() {
               </div>
               <div className="flex flex-col space-y-1.5">
                 <Label htmlFor="name">Bald</Label>
-                <Select>
+                <Select onValueChange={(value) => setBald(value === "true")}>
                   <SelectTrigger id="name">
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
@@ -103,13 +166,37 @@ export default function Home() {
                   </SelectContent>
                 </Select>
               </div>
-              <Upload />
+              <Upload
+                onUploadDone={(zipUrl) => {
+                  setZipUrl(zipUrl);
+                }}
+              />
             </div>
           </form>
         </CardContent>
         <CardFooter className="flex justify-between">
-          <Button variant="outline">Cancel</Button>
-          <Button>Create Model</Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              router.push("/");
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            disabled={
+              !zipUrl ||
+              !name ||
+              !type ||
+              !age ||
+              !ethnicity ||
+              !eyeColor ||
+              !bald
+            }
+            onClick={trainModel}
+          >
+            Create Model
+          </Button>
         </CardFooter>
       </Card>
     </div>
