@@ -7,8 +7,10 @@ import {
 import { prismaClient } from "db";
 import { S3Client } from "bun";
 import { FalAIModel } from "./models/FalAIModel";
+import cors from "cors";
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 const credentials = {
