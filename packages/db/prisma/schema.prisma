@@ -38,6 +38,7 @@ model Model {
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
   falAiRequestId String?
+  open           Boolean              @default(false)
   zipUrl         String
 }
 

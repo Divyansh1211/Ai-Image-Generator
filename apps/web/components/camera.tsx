@@ -3,7 +3,7 @@
 import { BACKEND_URL } from "@/app/config";
 import { useAuth } from "@clerk/nextjs";
 import axios from "axios";
-import { ImageCard, TImage } from "./ImageCard";
+import { ImageCard, ImageCardSkeleton, TImage } from "./ImageCard";
 import { useEffect, useState } from "react";
 
 async function getImages(token: string): Promise<TImage[]> {
@@ -17,6 +17,7 @@ async function getImages(token: string): Promise<TImage[]> {
 
 export function Camera() {
   const { getToken } = useAuth();
+  const [imageLoading, setImageLoading] = useState(true);
   const [images, setImages] = useState<TImage[]>([]);
   useEffect(() => {
     (async () => {
@@ -24,14 +25,18 @@ export function Camera() {
       if (!token) return;
       const images = await getImages(token);
       setImages(images);
+      setImageLoading(false);
     })();
   }, []);
   return (
-    <div>
-      {!images.length && <NoImage />}
+    <div className="grid md:grid-cols-4 grid-cols-1 gap-2">
       {images.map((image) => {
+        {
+          !images.length && <NoImage />;
+        }
         return <ImageCard {...image} />;
       })}
+      {imageLoading && <ImageCardSkeleton />}
     </div>
   );
 }

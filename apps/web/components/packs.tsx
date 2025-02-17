@@ -1,6 +1,7 @@
 import axios from "axios";
-import { PackCards, TPack } from "./PackCards";
 import { BACKEND_URL } from "@/app/config";
+import { PackClient } from "./PackClient";
+import { TPack } from "./PackCards";
 
 async function getPacks() {
   const res = await axios.get(`${BACKEND_URL}/pack/bulk`);
@@ -9,11 +10,5 @@ async function getPacks() {
 
 export async function Packs() {
   const packs: TPack[] = await getPacks();
-  return (
-    <div className="grid md:grid-cols-3 gap-4 p-4 grid-cols-1">
-      {packs.map((pack) => {
-        return <PackCards {...pack} />;
-      })}
-    </div>
-  );
+  return <PackClient packs={packs} />;
 }

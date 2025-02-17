@@ -114,6 +114,7 @@ app.post("/ai/generate", authMiddleware, async (req, res) => {
       modelId: parsedBody.data.modelId,
       userId: req.userId.toString(),
       imageUrl: "",
+      falAiRequestId: request_id,
     },
   });
   res.json({
@@ -183,7 +184,7 @@ app.get("/image/bulk", authMiddleware, async (req, res) => {
 app.get("/models", authMiddleware, async (req, res) => {
   const models = await prismaClient.model.findMany({
     where: {
-      userId: req.userId.toString(),
+      OR: [{ userId: req.userId.toString() }, { open: true }],
     },
   });
   res.status(200).json({ models });
