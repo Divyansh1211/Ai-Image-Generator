@@ -1,3 +1,8 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import Autoplay from "embla-carousel-autoplay";
+import { Button } from "./ui/button";
 import {
   Carousel,
   CarouselContent,
@@ -5,13 +10,24 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "./ui/carousel";
+import { SignedIn, SignedOut, SignInButton } from "@clerk/nextjs";
+import { useRef } from "react";
 
 export default function Hero() {
+  const plugin = useRef(Autoplay({ delay: 1000, stopOnInteraction: true }));
+  const router = useRouter();
   return (
     <div className="flex justify-center">
       <div className="max-w-3xl">
-        <h1 className=" text-8xl p-2 text-center">Generate Images for yourself</h1>
-        <Carousel>
+        <h1 className=" text-8xl p-2 text-center mb-7">
+          Generate Images for yourself
+        </h1>
+        <Carousel
+          opts={{ loop: true }}
+          plugins={[plugin.current]}
+          onMouseEnter={plugin.current.stop}
+          onMouseLeave={plugin.current.reset}
+        >
           <CarouselPrevious />
           <CarouselContent>
             <CarouselItem className="basis-1/4">
@@ -35,6 +51,31 @@ export default function Hero() {
           </CarouselContent>
           <CarouselNext />
         </Carousel>
+        <div className="flex justify-center">
+          <SignedIn>
+            <Button
+              variant={"secondary"}
+              className="mt-4 px-16 py-6"
+              size={"lg"}
+              onClick={() => {
+                router.push("/dashboard");
+              }}
+            >
+              Dashboard
+            </Button>
+          </SignedIn>
+          <SignedOut>
+            <SignInButton>
+              <Button
+                variant={"secondary"}
+                className="mt-4 px-16 py-6"
+                size={"lg"}
+              >
+                Login
+              </Button>
+            </SignInButton>
+          </SignedOut>
+        </div>
       </div>
     </div>
   );

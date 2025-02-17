@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { AppBar } from "@/components/appbar";
+import { ThemeProvider } from "@/components/theme-provider";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -27,8 +28,15 @@ export default function RootLayout({
     <html lang="en">
       <ClerkProvider>
         <body className={`${geistSans.variable} ${geistMono.variable}`}>
-          <AppBar />
-          {children}
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <AppBar />
+            {children}
+          </ThemeProvider>
         </body>
       </ClerkProvider>
     </html>

@@ -32,6 +32,7 @@ model Model {
   userId         String
   triggerWord    String?
   tensorPath     String?
+  thumbnail      String?
   trainingStatus ModelImageStatusEnum @default(Pending)
   output         OutputImages[]
   createdAt      DateTime             @default(now())
@@ -54,9 +55,12 @@ model OutputImages {
 }
 
 model Packs {
-  id      String        @id @default(cuid())
-  name    String
-  prompts PackPrompts[]
+  id          String        @id @default(cuid())
+  name        String
+  description String        @default("")
+  imageUrl1   String        @default("")
+  imageUrl2   String        @default("")
+  prompts     PackPrompts[]
 }
 
 model PackPrompts {

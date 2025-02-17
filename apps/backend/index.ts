@@ -180,8 +180,19 @@ app.get("/image/bulk", authMiddleware, async (req, res) => {
   });
 });
 
+app.get("/models", authMiddleware, async (req, res) => {
+  const models = await prismaClient.model.findMany({
+    where: {
+      userId: req.userId.toString(),
+    },
+  });
+  res.status(200).json({ models });
+});
+
 app.post("/fal-ai/webhook/train", async (req, res) => {
   const requestId = req.body.request_id;
+
+  const { imageUrl } = await falAiModel.generateImageSync(req.body.tensor_path);
 
   await prismaClient.model.updateMany({
     where: {
@@ -190,6 +201,7 @@ app.post("/fal-ai/webhook/train", async (req, res) => {
     data: {
       trainingStatus: "Generated",
       tensorPath: req.body.tensor_path,
+      thumbnail: imageUrl,
     },
   });
   res.status(200).send("OK");
